@@ -92,7 +92,7 @@ export default class WorldMap {
       if (!dataPoint.locationName) return;
       circles.push(this.createCircle(dataPoint));
     });
-    this.circlesLayer = this.addCircles(circles);
+    // this.circlesLayer = this.addCircles(circles);
     this.circles = circles;
   }
 
@@ -145,8 +145,10 @@ export default class WorldMap {
 
   createPopup(circle, locationName, value) {
     const unit = value && value === 1 ? this.ctrl.panel.unitSingular : this.ctrl.panel.unitPlural;
-    const label = (locationName + ': ' + value + ' ' + (unit || '')).trim();
-    circle.bindPopup(label, {'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels});
+    const label = ('<h3>ActiveProbing in ' + locationName.toUpperCase() + '</h3><br /><p>Current probes: ' + value + '<br />Errors: 7</p> ' + (unit || '')).trim();
+
+    circle.addTo(this.map).bindPopup(label, {'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': true, 'autoClose': false})
+          .openPopup();
 
     circle.on('mouseover', function onMouseOver(evt) {
       const layer = evt.target;

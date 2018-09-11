@@ -1,0 +1,1 @@
+docker run -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" -p 9200:9200 -d --name aws-es-proxy abutaha/aws-es-proxy ./aws-es-proxy -endpoint $ES_ENDPOINT -verbose -listen :9200

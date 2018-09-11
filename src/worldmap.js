@@ -4,10 +4,61 @@ import L from './libs/leaflet';
 /* eslint-disable id-length, no-unused-vars */
 
 const tileServers = {
-  'CartoDB Positron': { url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', subdomains: 'abcd'},
-  'CartoDB Dark': {url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', subdomains: 'abcd'}
+  'CartoDB Positron': { url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png', attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', subdomains: 'abcd' },
+  'CartoDB Dark': { url: 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png', attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="http://cartodb.com/attributions">CartoDB</a>', subdomains: 'abcd' }
 };
 
+/**
+window.L.CircleMarker.include({
+  bindLabel: function (content, options) {
+      if (!this._label || this._label.options !== options) {
+          this._label = new window.L.Label(options, this);
+      }
+
+      this._label.setContent(content);
+      this._labelNoHide = options && options.noHide;
+
+      if (!this._showLabelAdded) {
+          if (this._labelNoHide) {
+              this
+                  .on('remove', this.hideLabel, this)
+                  .on('move', this._moveLabel, this);
+              this._showLabel({latlng: this.getLatLng()});
+          } else {
+              this
+                  .on('mouseover', this._showLabel, this)
+                  .on('mousemove', this._moveLabel, this)
+                  .on('mouseout remove', this._hideLabel, this);
+              if (window.L.Browser.touch) {
+                  this.on('click', this._showLabel, this);
+              }
+          }
+          this._showLabelAdded = true;
+      }
+
+      return this;
+  },
+
+  unbindLabel: function () {
+      if (this._label) {
+          this._hideLabel();
+          this._label = null;
+          this._showLabelAdded = false;
+          if (this._labelNoHide) {
+              this
+                  .off('remove', this._hideLabel, this)
+                  .off('move', this._moveLabel, this);
+          } else {
+              this
+                  .off('mouseover', this._showLabel, this)
+                  .off('mousemove', this._moveLabel, this)
+                  .off('mouseout remove', this._hideLabel, this);
+          }
+      }
+      return this;
+  }
+});
+*/
 export default class WorldMap {
   constructor(ctrl, mapContainer) {
     this.ctrl = ctrl;
@@ -33,7 +84,7 @@ export default class WorldMap {
   }
 
   createLegend() {
-    this.legend = window.L.control({position: 'bottomleft'});
+    this.legend = window.L.control({ position: 'bottomleft' });
     this.legend.onAdd = () => {
       this.legend._div = window.L.DomUtil.create('div', 'info legend');
       this.legend.update();
@@ -44,7 +95,7 @@ export default class WorldMap {
       const thresholds = this.ctrl.data.thresholds;
       let legendHtml = '';
       legendHtml += '<div class="legend-item"><i style="background:' + this.ctrl.panel.colors[0] + '"></i> ' +
-          '&lt; ' + thresholds[0] + '</div>';
+        '&lt; ' + thresholds[0] + '</div>';
       for (let index = 0; index < thresholds.length; index += 1) {
         legendHtml +=
           '<div class="legend-item"><i style="background:' + this.ctrl.panel.colors[index + 1] + '"></i> ' +
@@ -102,7 +153,9 @@ export default class WorldMap {
 
       const circle = _.find(this.circles, (cir) => { return cir.options.location === dataPoint.key; });
 
-      if (circle) {
+      if (circle && dataPoint.isAp) {
+        this.updateApCircle(circle, dataPoint);
+      } else if (circle) {
         circle.setRadius(this.calcCircleSize(dataPoint.value || 0));
         circle.setStyle({
           color: this.getColor(dataPoint.value),
@@ -112,11 +165,23 @@ export default class WorldMap {
         });
         circle.unbindPopup();
         this.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
+
+        //TODO to function
+        circle.unbindTooltip();
+        const text = (dataPoint.totalProbes - dataPoint.failingProbes) + "/" + dataPoint.totalProbes;
+        circle.bindTooltip(text, {
+          permanent: true,
+          direction: 'center'
+        });
       }
     });
   }
 
   createCircle(dataPoint) {
+    if (dataPoint.isAp) {
+      return this.createApCircle(dataPoint);
+    }
+
     const circle = window.L.circleMarker([dataPoint.locationLatitude, dataPoint.locationLongitude], {
       radius: this.calcCircleSize(dataPoint.value || 0),
       color: this.getColor(dataPoint.value),
@@ -127,6 +192,86 @@ export default class WorldMap {
 
     this.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
     return circle;
+  }
+
+  updateApCircle(circle, dataPoint) {
+    circle.setRadius(this.calcCircleSize(dataPoint.value || 0));
+    circle.setStyle({
+      color: this.getColor(dataPoint.successRate),
+      fillColor: this.getColor(dataPoint.successRate),
+      fillOpacity: 0.5,
+      location: dataPoint.key,
+    });
+    circle.unbindPopup();
+    this.createApPopup(circle, dataPoint);
+
+    circle.unbindTooltip();
+    this.createApTooltip(circle, dataPoint);
+  }
+
+  createApCircle(dataPoint) {
+    const circle = window.L.circleMarker([dataPoint.locationLatitude, dataPoint.locationLongitude], {
+      radius: this.calcCircleSize(dataPoint.value || 0),
+      color: this.getColor(dataPoint.successRate),
+      fillColor: this.getColor(dataPoint.successRate),
+      fillOpacity: 0.5,
+      location: dataPoint.key
+    });
+
+    this.createApTooltip(circle, dataPoint);
+    this.createApPopup(circle, dataPoint);
+    return circle;
+  }
+
+  createApTooltip(circle, dataPoint) {
+    //const text = dataPoint.failingProbes + "/" + dataPoint.totalProbes;
+    let text;
+    if (dataPoint.failingProbes <= 0) {
+      text = `<div class="ap-larger"><b>${dataPoint.totalProbes}</b></div>`;
+    } else {
+      text = `
+        <div class="ap-larger" style="margin-top: 20px;"><b>${dataPoint.totalProbes}</b></div>
+        <div class="ap-meter">
+            <span class="ap-meter-span" style="width: ${100 - dataPoint.successRate}%"></span>
+            <div class="ap-meter-label"><b>${dataPoint.failingProbes}</b></div>
+        </div>
+      `;
+    }
+
+    circle.bindTooltip(text, {
+      permanent: true,
+      direction: 'center'
+    });
+  }
+
+  createApPopup(circle, dataPoint) {
+    const locationName = dataPoint.locationName;
+    const value = dataPoint.valueRounded;
+    const unit = value && value === 1 ? this.ctrl.panel.unitSingular : this.ctrl.panel.unitPlural;
+    //const label = (locationName + ': ' + value + ' ' + (unit || '')).trim();
+    let label = `
+      <h4>[AP] ${locationName}</h4>
+      <ul>
+        <li>Success rate: ${dataPoint.successRate}%</li>
+        <li>Total probes: ${dataPoint.totalProbes}</li>
+        <li>Failing probes: ${dataPoint.failingProbes}</li>
+        <li>Failing probes name(s): ${dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-"}</li>
+      </ul>
+    `.trim();
+
+    circle.bindPopup(label, { 'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
+
+    circle.on('mouseover', function onMouseOver(evt) {
+      const layer = evt.target;
+      layer.bringToFront();
+      this.openPopup();
+    });
+
+    if (!this.ctrl.panel.stickyLabels) {
+      circle.on('mouseout', function onMouseOut() {
+        circle.closePopup();
+      });
+    }
   }
 
   calcCircleSize(dataPointValue) {
@@ -146,7 +291,7 @@ export default class WorldMap {
   createPopup(circle, locationName, value) {
     const unit = value && value === 1 ? this.ctrl.panel.unitSingular : this.ctrl.panel.unitPlural;
     const label = (locationName + ': ' + value + ' ' + (unit || '')).trim();
-    circle.bindPopup(label, {'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels});
+    circle.bindPopup(label, { 'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
 
     circle.on('mouseover', function onMouseOver(evt) {
       const layer = evt.target;

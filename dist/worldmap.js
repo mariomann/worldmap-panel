@@ -155,7 +155,9 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
                 return cir.options.location === dataPoint.key;
               });
 
-              if (circle) {
+              if (circle && dataPoint.isAp) {
+                _this4.updateApCircle(circle, dataPoint);
+              } else if (circle) {
                 circle.setRadius(_this4.calcCircleSize(dataPoint.value || 0));
                 circle.setStyle({
                   color: _this4.getColor(dataPoint.value),
@@ -165,12 +167,24 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
                 });
                 circle.unbindPopup();
                 _this4.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
+
+                //TODO to function
+                circle.unbindTooltip();
+                var text = dataPoint.totalProbes - dataPoint.failingProbes + "/" + dataPoint.totalProbes;
+                circle.bindTooltip(text, {
+                  permanent: true,
+                  direction: 'center'
+                });
               }
             });
           }
         }, {
           key: 'createCircle',
           value: function createCircle(dataPoint) {
+            if (dataPoint.isAp) {
+              return this.createApCircle(dataPoint);
+            }
+
             var circle = window.L.circleMarker([dataPoint.locationLatitude, dataPoint.locationLongitude], {
               radius: this.calcCircleSize(dataPoint.value || 0),
               color: this.getColor(dataPoint.value),
@@ -181,6 +195,76 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
 
             this.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
             return circle;
+          }
+        }, {
+          key: 'updateApCircle',
+          value: function updateApCircle(circle, dataPoint) {
+            circle.setRadius(this.calcCircleSize(dataPoint.value || 0));
+            circle.setStyle({
+              color: this.getColor(dataPoint.successRate),
+              fillColor: this.getColor(dataPoint.successRate),
+              fillOpacity: 0.5,
+              location: dataPoint.key
+            });
+            circle.unbindPopup();
+            this.createApPopup(circle, dataPoint);
+
+            circle.unbindTooltip();
+            this.createApTooltip(circle, dataPoint);
+          }
+        }, {
+          key: 'createApCircle',
+          value: function createApCircle(dataPoint) {
+            var circle = window.L.circleMarker([dataPoint.locationLatitude, dataPoint.locationLongitude], {
+              radius: this.calcCircleSize(dataPoint.value || 0),
+              color: this.getColor(dataPoint.successRate),
+              fillColor: this.getColor(dataPoint.successRate),
+              fillOpacity: 0.5,
+              location: dataPoint.key
+            });
+
+            this.createApTooltip(circle, dataPoint);
+            this.createApPopup(circle, dataPoint);
+            return circle;
+          }
+        }, {
+          key: 'createApTooltip',
+          value: function createApTooltip(circle, dataPoint) {
+            //const text = dataPoint.failingProbes + "/" + dataPoint.totalProbes;
+            var text = void 0;
+            if (dataPoint.failingProbes <= 0) {
+              text = '<div class="ap-larger"><b>' + dataPoint.totalProbes + '</b></div>';
+            } else {
+              text = '\n        <div class="ap-larger" style="margin-top: 20px;"><b>' + dataPoint.totalProbes + '</b></div>\n        <div class="ap-meter">\n            <span class="ap-meter-span" style="width: ' + (100 - dataPoint.successRate) + '%"></span>\n            <div class="ap-meter-label"><b>' + dataPoint.failingProbes + '</b></div>\n        </div>\n      ';
+            }
+
+            circle.bindTooltip(text, {
+              permanent: true,
+              direction: 'center'
+            });
+          }
+        }, {
+          key: 'createApPopup',
+          value: function createApPopup(circle, dataPoint) {
+            var locationName = dataPoint.locationName;
+            var value = dataPoint.valueRounded;
+            var unit = value && value === 1 ? this.ctrl.panel.unitSingular : this.ctrl.panel.unitPlural;
+            //const label = (locationName + ': ' + value + ' ' + (unit || '')).trim();
+            var label = ('\n      <h4>[AP] ' + locationName + '</h4>\n      <ul>\n        <li>Success rate: ' + dataPoint.successRate + '%</li>\n        <li>Total probes: ' + dataPoint.totalProbes + '</li>\n        <li>Failing probes: ' + dataPoint.failingProbes + '</li>\n        <li>Failing probes name(s): ' + (dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-") + '</li>\n      </ul>\n    ').trim();
+
+            circle.bindPopup(label, { 'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
+
+            circle.on('mouseover', function onMouseOver(evt) {
+              var layer = evt.target;
+              layer.bringToFront();
+              this.openPopup();
+            });
+
+            if (!this.ctrl.panel.stickyLabels) {
+              circle.on('mouseout', function onMouseOut() {
+                circle.closePopup();
+              });
+            }
           }
         }, {
           key: 'calcCircleSize',

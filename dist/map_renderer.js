@@ -1,6 +1,6 @@
 'use strict';
 
-System.register(['./css/leaflet.css!', './worldmap'], function (_export, _context) {
+System.register(['./css/leaflet.css!', './css/ap.css!', './worldmap'], function (_export, _context) {
   "use strict";
 
   var WorldMap;
@@ -36,7 +36,7 @@ System.register(['./css/leaflet.css!', './worldmap'], function (_export, _contex
   _export('default', link);
 
   return {
-    setters: [function (_cssLeafletCss) {}, function (_worldmap) {
+    setters: [function (_cssLeafletCss) {}, function (_cssApCss) {}, function (_worldmap) {
       WorldMap = _worldmap.default;
     }],
     execute: function () {}

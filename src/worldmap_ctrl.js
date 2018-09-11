@@ -1,5 +1,5 @@
 /* eslint import/no-extraneous-dependencies: 0 */
-import {MetricsPanelCtrl} from 'app/plugins/sdk';
+import { MetricsPanelCtrl } from 'app/plugins/sdk';
 import TimeSeries from 'app/core/time_series2';
 import kbn from 'app/core/utils/kbn';
 
@@ -154,8 +154,16 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
       this.series = dataList;
       this.dataFormatter.setJsonValues(data);
     } else {
-      this.series = dataList.map(this.seriesHandler.bind(this));
-      this.dataFormatter.setValues(data);
+      console.log('Processing AP data..');
+      const regions = this.processApData(dataList);
+      if (regions.length > 0) {
+        this.series = regions.map(this.apSeriesHandler.bind(this));
+        this.dataFormatter.setApValues(data);
+      } else {
+        this.series = dataList.map(this.seriesHandler.bind(this));
+        this.dataFormatter.setValues(data);
+      }
+
     }
     this.data = data;
 
@@ -176,6 +184,81 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
 
   onDataSnapshotLoad(snapshotData) {
     this.onDataReceived(snapshotData);
+  }
+
+  // process the data form the query 
+  processApData(dataList) {
+    const regions = [];
+
+    dataList.forEach(element => {
+      // ensure we are not dealing with something not AP related
+      if (!element.target || !element.props["location.keyword"] || !element.props["id.keyword"]) {
+        return; // this is continue actually
+      }
+
+      const location = element.props["location.keyword"];
+      const id = element.props["id.keyword"];
+      const isKO = element.target.endsWith("KO");
+
+      // find region
+      let region = regions.find(r => location == r.name);
+      if (region === undefined) {
+        region = {
+          name: location,
+          ids: [],
+          failedIds: []
+        };
+        regions.push(region);
+      }
+
+      // resolve if ID has been processed
+      const idExists = region.ids.includes(id);
+      if (!idExists) {
+        region.ids.push(id);
+      }
+
+      // in case of KO need to understand if it fails
+      if (isKO) {
+        // first find the OK equivalent 
+        const allTarget = element.target.replace("__KO", "__ALL");
+        const allElement = dataList.find(d => d.target == allTarget);
+        // if we can not find than it's serious error
+        if (allElement === undefined) {
+          console.error("Unable to locate the " + allTarget + " data series.");
+        } else {
+          for (let index = 0; index < element.datapoints.length; index++) {
+            const failingInstances = element.datapoints[index][0];
+            const allInstances = allElement.datapoints[index][0];
+            if (failingInstances == allInstances) {
+              region.failedIds.push(id);
+              break;
+            }
+          }
+        }
+      }
+    });
+
+    return regions;
+  }
+
+  apSeriesHandler(region) {
+    const total = region.ids.length;
+    const failing = region.failedIds.length;
+    const successRate = ((total - failing) / total * 100).toFixed(0);
+
+    const series = new TimeSeries({
+      datapoints: [],
+      alias: region.name
+    });
+
+    series.stats = {
+      successRate: successRate,
+      totalProbes: total,
+      failingProbes: failing,
+      failingProbesNames: region.failedIds
+    }
+
+    return series;
   }
 
   seriesHandler(seriesData) {

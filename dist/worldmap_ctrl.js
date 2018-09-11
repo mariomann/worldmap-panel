@@ -229,8 +229,15 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
               this.series = dataList;
               this.dataFormatter.setJsonValues(data);
             } else {
-              this.series = dataList.map(this.seriesHandler.bind(this));
-              this.dataFormatter.setValues(data);
+              console.log('Processing AP data..');
+              var regions = this.processApData(dataList);
+              if (regions.length > 0) {
+                this.series = regions.map(this.apSeriesHandler.bind(this));
+                this.dataFormatter.setApValues(data);
+              } else {
+                this.series = dataList.map(this.seriesHandler.bind(this));
+                this.dataFormatter.setValues(data);
+              }
             }
             this.data = data;
 
@@ -253,6 +260,86 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
           key: 'onDataSnapshotLoad',
           value: function onDataSnapshotLoad(snapshotData) {
             this.onDataReceived(snapshotData);
+          }
+        }, {
+          key: 'processApData',
+          value: function processApData(dataList) {
+            var regions = [];
+
+            dataList.forEach(function (element) {
+              // ensure we are not dealing with something not AP related
+              if (!element.target || !element.props["location.keyword"] || !element.props["id.keyword"]) {
+                return; // this is continue actually
+              }
+
+              var location = element.props["location.keyword"];
+              var id = element.props["id.keyword"];
+              var isKO = element.target.endsWith("KO");
+
+              // find region
+              var region = regions.find(function (r) {
+                return location == r.name;
+              });
+              if (region === undefined) {
+                region = {
+                  name: location,
+                  ids: [],
+                  failedIds: []
+                };
+                regions.push(region);
+              }
+
+              // resolve if ID has been processed
+              var idExists = region.ids.includes(id);
+              if (!idExists) {
+                region.ids.push(id);
+              }
+
+              // in case of KO need to understand if it fails
+              if (isKO) {
+                // first find the OK equivalent 
+                var allTarget = element.target.replace("__KO", "__ALL");
+                var allElement = dataList.find(function (d) {
+                  return d.target == allTarget;
+                });
+                // if we can not find than it's serious error
+                if (allElement === undefined) {
+                  console.error("Unable to locate the " + allTarget + " data series.");
+                } else {
+                  for (var index = 0; index < element.datapoints.length; index++) {
+                    var failingInstances = element.datapoints[index][0];
+                    var allInstances = allElement.datapoints[index][0];
+                    if (failingInstances == allInstances) {
+                      region.failedIds.push(id);
+                      break;
+                    }
+                  }
+                }
+              }
+            });
+
+            return regions;
+          }
+        }, {
+          key: 'apSeriesHandler',
+          value: function apSeriesHandler(region) {
+            var total = region.ids.length;
+            var failing = region.failedIds.length;
+            var successRate = ((total - failing) / total * 100).toFixed(0);
+
+            var series = new TimeSeries({
+              datapoints: [],
+              alias: region.name
+            });
+
+            series.stats = {
+              successRate: successRate,
+              totalProbes: total,
+              failingProbes: failing,
+              failingProbesNames: region.failedIds
+            };
+
+            return series;
           }
         }, {
           key: 'seriesHandler',

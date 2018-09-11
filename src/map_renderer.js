@@ -1,4 +1,5 @@
 import './css/leaflet.css!';
+import './css/ap.css!';
 import WorldMap from './worldmap';
 
 export default function link(scope, elem, attrs, ctrl) {

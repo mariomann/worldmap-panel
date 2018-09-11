@@ -46,6 +46,45 @@ export default class DataFormatter {
     }
   }
 
+  setApValues(data) {
+    if (this.ctrl.series && this.ctrl.series.length > 0) {
+      let highestValue = 0;
+      let lowestValue = Number.MAX_VALUE;
+
+      this.ctrl.series.forEach((serie) => {
+        const location = _.find(this.ctrl.locations, (loc) => { return loc.key.toUpperCase() === serie.alias.toUpperCase(); });
+
+        if (!location) return;
+
+        const dataValue = {
+          key: serie.alias,
+          locationName: location.name,
+          locationLatitude: location.latitude,
+          locationLongitude: location.longitude,
+          value: serie.stats["totalProbes"],
+          valueFormatted: serie.stats["successRate"] + "%",
+          valueRounded: 0,
+          totalProbes: serie.stats["totalProbes"],
+          failingProbes: serie.stats["failingProbes"],
+          failingProbesNames: serie.stats["failingProbesNames"],
+          successRate: serie.stats["successRate"],
+          isAp: true
+        }
+
+        if (dataValue.value > highestValue) highestValue = dataValue.value;
+        if (dataValue.value < lowestValue) lowestValue = dataValue.value;
+
+        dataValue.valueRounded = this.kbn.roundValue(dataValue.value, parseInt(this.ctrl.panel.decimals, 10) || 0);
+        data.push(dataValue);
+      }
+      );
+
+      data.highestValue = highestValue;
+      data.lowestValue = lowestValue;
+      data.valueRange = highestValue - lowestValue;
+    }
+  }
+
   createDataValue(encodedGeohash, decodedGeohash, locationName, value) {
     const dataValue = {
       key: encodedGeohash,

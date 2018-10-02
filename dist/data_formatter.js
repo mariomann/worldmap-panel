@@ -116,6 +116,7 @@ System.register(['lodash', './geohash'], function (_export, _context) {
                   failingProbes: serie.stats["failingProbes"],
                   failingProbesNames: serie.stats["failingProbesNames"],
                   successRate: serie.stats["successRate"],
+                  targetEnvironments: serie.stats["targetEnvironments"],
                   isAp: true
                 };
 

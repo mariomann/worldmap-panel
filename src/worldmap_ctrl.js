@@ -197,6 +197,7 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
       }
 
       const location = element.props["location.keyword"];
+      const targetEnvironment = element.props["targetEnvironment.keyword"];
       const id = element.props["id.keyword"];
       const isKO = element.target.endsWith("KO");
 
@@ -206,7 +207,8 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
         region = {
           name: location,
           ids: [],
-          failedIds: []
+          failedIds: [],
+          environments: {}
         };
         regions.push(region);
       }
@@ -215,6 +217,16 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
       const idExists = region.ids.includes(id);
       if (!idExists) {
         region.ids.push(id);
+      }
+
+      if (!isKO) {
+        if (targetEnvironment !== undefined) {
+          if (region.environments[targetEnvironment]) {
+            region.environments[targetEnvironment] = region.environments[targetEnvironment] + 1;
+          } else {
+            region.environments[targetEnvironment] = 1;
+          }
+        }
       }
 
       // in case of KO need to understand if it fails
@@ -255,7 +267,8 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
       successRate: successRate,
       totalProbes: total,
       failingProbes: failing,
-      failingProbesNames: region.failedIds
+      failingProbesNames: region.failedIds,
+      targetEnvironments: region.environments
     }
 
     return series;

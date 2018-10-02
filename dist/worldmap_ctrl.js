@@ -273,6 +273,7 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
               }
 
               var location = element.props["location.keyword"];
+              var targetEnvironment = element.props["targetEnvironment.keyword"];
               var id = element.props["id.keyword"];
               var isKO = element.target.endsWith("KO");
 
@@ -284,7 +285,8 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
                 region = {
                   name: location,
                   ids: [],
-                  failedIds: []
+                  failedIds: [],
+                  environments: {}
                 };
                 regions.push(region);
               }
@@ -293,6 +295,16 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
               var idExists = region.ids.includes(id);
               if (!idExists) {
                 region.ids.push(id);
+              }
+
+              if (!isKO) {
+                if (targetEnvironment !== undefined) {
+                  if (region.environments[targetEnvironment]) {
+                    region.environments[targetEnvironment] = region.environments[targetEnvironment] + 1;
+                  } else {
+                    region.environments[targetEnvironment] = 1;
+                  }
+                }
               }
 
               // in case of KO need to understand if it fails
@@ -336,7 +348,8 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
               successRate: successRate,
               totalProbes: total,
               failingProbes: failing,
-              failingProbesNames: region.failedIds
+              failingProbesNames: region.failedIds,
+              targetEnvironments: region.environments
             };
 
             return series;

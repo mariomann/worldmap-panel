@@ -235,7 +235,9 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
             if (dataPoint.failingProbes <= 0) {
               text = '<div class="ap-larger"><b>' + dataPoint.totalProbes + '</b></div>';
             } else {
-              text = '\n        <div class="ap-larger" style="margin-top: 20px;"><b>' + dataPoint.totalProbes + '</b></div>\n        <div class="ap-meter">\n            <span class="ap-meter-span" style="width: ' + (100 - dataPoint.successRate) + '%"></span>\n            <div class="ap-meter-label"><b>' + dataPoint.failingProbes + '</b></div>\n        </div>\n      ';
+              text = '\n        <div class="ap-larger" style="margin-top: 20px;"><b>' + dataPoint.totalProbes + '</b></div>\n        <div class="ap-meter">\n            <span class="ap-meter-span" style="width: ' + dataPoint.successRate + '%"><b>' + (dataPoint.totalProbes - dataPoint.failingProbes) + '</b></span>\n        </div>\n      ';
+
+              // add  <div class="ap-meter-label"><b>${dataPoint.totalProbes - dataPoint.failingProbes}</b></div> to have number right to the progress bar
             }
 
             circle.bindTooltip(text, {
@@ -250,7 +252,13 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
             var value = dataPoint.valueRounded;
             var unit = value && value === 1 ? this.ctrl.panel.unitSingular : this.ctrl.panel.unitPlural;
             //const label = (locationName + ': ' + value + ' ' + (unit || '')).trim();
-            var label = ('\n      <h4>[AP] ' + locationName + '</h4>\n      <ul>\n        <li>Success rate: ' + dataPoint.successRate + '%</li>\n        <li>Total probes: ' + dataPoint.totalProbes + '</li>\n        <li>Failing probes: ' + dataPoint.failingProbes + '</li>\n        <li>Failing probes name(s): ' + (dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-") + '</li>\n      </ul>\n    ').trim();
+            var label = '\n      <h4>[AP] ' + locationName + '</h4>\n      <ul>\n        <li>Success rate: ' + dataPoint.successRate + '% (' + dataPoint.failingProbes + ' failing out of ' + dataPoint.totalProbes + ')</li>\n        <li>Tested environments:\n    ';
+
+            for (var environment in dataPoint.targetEnvironments) {
+              label += '<br/>\t\t- ' + environment + ': ' + dataPoint.targetEnvironments[environment];
+            }
+
+            label += ('\n        </li>\n        <li>Failing probes name(s): ' + (dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-") + '</li>\n      </ul>\n    ').trim();
 
             circle.bindPopup(label, { 'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
 

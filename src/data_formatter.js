@@ -68,6 +68,7 @@ export default class DataFormatter {
           failingProbes: serie.stats["failingProbes"],
           failingProbesNames: serie.stats["failingProbesNames"],
           successRate: serie.stats["successRate"],
+          targetEnvironments: serie.stats["targetEnvironments"],
           isAp: true
         }
 

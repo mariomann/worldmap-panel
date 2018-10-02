@@ -232,10 +232,11 @@ export default class WorldMap {
       text = `
         <div class="ap-larger" style="margin-top: 20px;"><b>${dataPoint.totalProbes}</b></div>
         <div class="ap-meter">
-            <span class="ap-meter-span" style="width: ${100 - dataPoint.successRate}%"></span>
-            <div class="ap-meter-label"><b>${dataPoint.failingProbes}</b></div>
+            <span class="ap-meter-span" style="width: ${dataPoint.successRate}%"><b>${dataPoint.totalProbes - dataPoint.failingProbes}</b></span>
         </div>
       `;
+
+      // add  <div class="ap-meter-label"><b>${dataPoint.totalProbes - dataPoint.failingProbes}</b></div> to have number right to the progress bar
     }
 
     circle.bindTooltip(text, {
@@ -252,9 +253,16 @@ export default class WorldMap {
     let label = `
       <h4>[AP] ${locationName}</h4>
       <ul>
-        <li>Success rate: ${dataPoint.successRate}%</li>
-        <li>Total probes: ${dataPoint.totalProbes}</li>
-        <li>Failing probes: ${dataPoint.failingProbes}</li>
+        <li>Success rate: ${dataPoint.successRate}% (${dataPoint.failingProbes} failing out of ${dataPoint.totalProbes})</li>
+        <li>Tested environments:
+    `;
+
+    for (var environment in dataPoint.targetEnvironments) {
+      label += `<br/>\t\t- ${environment}: ${dataPoint.targetEnvironments[environment]}`;
+    }
+
+    label += `
+        </li>
         <li>Failing probes name(s): ${dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-"}</li>
       </ul>
     `.trim();

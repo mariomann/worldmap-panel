@@ -220,6 +220,20 @@ export default class WorldMap {
 
     this.createApTooltip(circle, dataPoint);
     this.createApPopup(circle, dataPoint);
+
+    // create link for clicking on circle
+    // try to get target dashboard name from the variable called locationDashboard
+    let locationDashboardName = null;
+    if (this.ctrl.templateSrv.variableExists("$locationDashboard")) {
+      locationDashboardName = this.ctrl.templateSrv.replace("$locationDashboard");
+    } else {
+      locationDashboardName = "probe-overview-per-location";
+    }
+    const locationLink = `dashboard/db/${locationDashboardName}?var-location=${dataPoint.key}`;
+    circle.on('click', function (e) {
+      window.open(locationLink, "_self");
+    });
+
     return circle;
   }
 

@@ -275,11 +275,13 @@ export default class WorldMap {
       label += `<br/>\t\t- ${environment}: ${dataPoint.targetEnvironments[environment]}`;
     }
 
-    label += `
+    if(dataPoint.failingProbesNames.length > 0) {
+      label += `
         </li>
         <li>Failing probes name(s): ${dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-"}</li>
       </ul>
     `.trim();
+    }
 
     circle.bindPopup(label, { 'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
 

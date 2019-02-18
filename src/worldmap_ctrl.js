@@ -1,8 +1,9 @@
 /* eslint import/no-extraneous-dependencies: 0 */
-import { MetricsPanelCtrl } from 'app/plugins/sdk';
+import {MetricsPanelCtrl} from 'app/plugins/sdk';
 import TimeSeries from 'app/core/time_series2';
 import kbn from 'app/core/utils/kbn';
 
+import config from 'app/core/config';
 import _ from 'lodash';
 import mapRenderer from './map_renderer';
 import DataFormatter from './data_formatter';
@@ -111,7 +112,7 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
       // .. Do nothing
     } else if (this.panel.locationData !== 'geohash' && this.panel.locationData !== 'json result') {
       window.$.getJSON('public/plugins/grafana-worldmap-panel/data/' + this.panel.locationData + '.json')
-        .then(this.reloadLocations.bind(this));
+          .then(this.reloadLocations.bind(this));
     }
   }
 
@@ -186,8 +187,94 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
     this.onDataReceived(snapshotData);
   }
 
-  // process the data form the query 
-  processApData(dataList) {
+  resolveDatasourceType() {
+    if (this.datasourceType !== undefined) {
+      return this.datasourceType;
+    } else {
+      try {
+        const ds = this.panel.datasource !== null ? this.panel.datasource : config.defaultDatasource;
+        this.datasourceType = this.datasourceSrv.datasources[ds].meta.id;
+        return this.datasourceType;
+      } catch (err) {
+        var e = new Error("Failed to resolve Datasource: " + err.message);
+        e.origError = err;
+        throw e;
+      }
+    }
+  }
+
+  buildColumnMap(columns) {
+    var required_columns = ['id', 'location', 'targetEnvironment', 'status'];
+    var columnMap = {};
+    for (var i = 0; i < columns.length; i++) {
+      var cName = columns[i].text;
+      var idx = required_columns.indexOf(cName);
+      if (idx > -1) {
+        columnMap[cName] = i;
+        required_columns.splice(idx, 1);
+      }
+    }
+
+    if (required_columns.length === 0) {
+      return columnMap;
+    }
+    throw 'Invalid columns received. Required: <' + required_columns.toString() + '>';
+  }
+
+
+
+  processAPInfluxTableData(dataList) {
+
+    const regions = [];
+    dataList.forEach(element => {
+
+      var columnMap = this.buildColumnMap(element.columns);
+      // ensure we are not dealing with something not AP related
+      if (!columnMap) {
+        return; // this is continue actually
+      }
+
+      element.rows.forEach(row => {
+
+        const id = row[columnMap['id']];
+        const location = row[columnMap['location']];
+        const targetEnvironment = row[columnMap['targetEnvironment']];
+        const isKO = row[columnMap['status']] === 0;
+
+        let region = regions.find(r => location === r.name);
+        if (region === undefined) {
+          region = {
+            name: location,
+            ids: [],
+            failedIds: [],
+            environments: {}
+          };
+          regions.push(region);
+        }
+
+        const idExists = region.ids.includes(id);
+        if (!idExists) {
+          region.ids.push(id);
+        }
+        if (isKO) {
+          if (!region.failedIds.includes(id)) {
+            region.failedIds.push(id);
+          }
+        }
+
+        if (targetEnvironment !== undefined) {
+          if (region.environments[targetEnvironment]) {
+            region.environments[targetEnvironment] = region.environments[targetEnvironment] + 1;
+          } else {
+            region.environments[targetEnvironment] = 1;
+          }
+        }
+      });
+    });
+    return regions;
+  }
+
+  processAPESData(dataList) {
     const regions = [];
 
     dataList.forEach(element => {
@@ -231,17 +318,17 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
 
       // in case of KO need to understand if it fails
       if (isKO) {
-        // first find the OK equivalent 
-        const allTarget = element.target.replace("__KO", "__ALL");
+        // first find the OK equivalent
+        const allTarget = element.target.replace('__KO', '__ALL');
         const allElement = dataList.find(d => d.target == allTarget);
         // if we can not find than it's serious error
         if (allElement === undefined) {
-          console.error("Unable to locate the " + allTarget + " data series.");
+          console.error('Unable to locate the ' + allTarget + ' data series.');
         } else {
           for (let index = 0; index < element.datapoints.length; index++) {
             const failingInstances = element.datapoints[index][0];
             const allInstances = allElement.datapoints[index][0];
-            if (failingInstances == allInstances) {
+            if (failingInstances === allInstances) {
               region.failedIds.push(id);
               break;
             }
@@ -251,6 +338,18 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
     });
 
     return regions;
+  }
+
+  processApData(dataList) {
+    const dsType = this.resolveDatasourceType();
+    switch (dsType) {
+      case 'influxdb':
+        return this.processAPInfluxTableData(dataList);
+      case 'elasticsearch':
+        return this.processAPESData(dataList);
+      default:
+        throw 'Unsupported datasource <' + dsType + '>';
+    }
   }
 
   apSeriesHandler(region) {
@@ -343,7 +442,7 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
     }
   }
 
-/* eslint class-methods-use-this: 0 */
+  /* eslint class-methods-use-this: 0 */
   link(scope, elem, attrs, ctrl) {
     mapRenderer(scope, elem, attrs, ctrl);
   }

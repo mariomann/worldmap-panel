@@ -272,7 +272,9 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
               label += '<br/>\t\t- ' + environment + ': ' + dataPoint.targetEnvironments[environment];
             }
 
-            label += ('\n        </li>\n        <li>Failing probes name(s): ' + (dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-") + '</li>\n      </ul>\n    ').trim();
+            if (dataPoint.failingProbesNames.length > 0) {
+              label += ('\n        </li>\n        <li>Failing probes name(s): ' + (dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-") + '</li>\n      </ul>\n    ').trim();
+            }
 
             circle.bindPopup(label, { 'offset': window.L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
 

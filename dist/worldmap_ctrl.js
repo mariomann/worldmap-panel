@@ -1,9 +1,9 @@
 'use strict';
 
-System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn', 'lodash', './map_renderer', './data_formatter', './css/worldmap-panel.css!'], function (_export, _context) {
+System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn', 'app/core/config', 'lodash', './map_renderer', './data_formatter', './css/worldmap-panel.css!'], function (_export, _context) {
   "use strict";
 
-  var MetricsPanelCtrl, TimeSeries, kbn, _, mapRenderer, DataFormatter, _createClass, panelDefaults, mapCenters, WorldmapCtrl;
+  var MetricsPanelCtrl, TimeSeries, kbn, config, _, mapRenderer, DataFormatter, _createClass, panelDefaults, mapCenters, WorldmapCtrl;
 
   function _classCallCheck(instance, Constructor) {
     if (!(instance instanceof Constructor)) {
@@ -42,6 +42,8 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
       TimeSeries = _appCoreTime_series.default;
     }, function (_appCoreUtilsKbn) {
       kbn = _appCoreUtilsKbn.default;
+    }, function (_appCoreConfig) {
+      config = _appCoreConfig.default;
     }, function (_lodash) {
       _ = _lodash.default;
     }, function (_map_renderer) {
@@ -262,8 +264,99 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
             this.onDataReceived(snapshotData);
           }
         }, {
-          key: 'processApData',
-          value: function processApData(dataList) {
+          key: 'resolveDatasourceType',
+          value: function resolveDatasourceType() {
+            if (this.datasourceType !== undefined) {
+              return this.datasourceType;
+            } else {
+              try {
+                var ds = this.panel.datasource !== null ? this.panel.datasource : config.defaultDatasource;
+                this.datasourceType = this.datasourceSrv.datasources[ds].meta.id;
+                return this.datasourceType;
+              } catch (err) {
+                var e = new Error("Failed to resolve Datasource: " + err.message);
+                e.origError = err;
+                throw e;
+              }
+            }
+          }
+        }, {
+          key: 'buildColumnMap',
+          value: function buildColumnMap(columns) {
+            var required_columns = ['id', 'location', 'targetEnvironment', 'status'];
+            var columnMap = {};
+            for (var i = 0; i < columns.length; i++) {
+              var cName = columns[i].text;
+              var idx = required_columns.indexOf(cName);
+              if (idx > -1) {
+                columnMap[cName] = i;
+                required_columns.splice(idx, 1);
+              }
+            }
+
+            if (required_columns.length === 0) {
+              return columnMap;
+            }
+            throw 'Invalid columns received. Required: <' + required_columns.toString() + '>';
+          }
+        }, {
+          key: 'processAPInfluxTableData',
+          value: function processAPInfluxTableData(dataList) {
+            var _this3 = this;
+
+            var regions = [];
+            dataList.forEach(function (element) {
+
+              var columnMap = _this3.buildColumnMap(element.columns);
+              // ensure we are not dealing with something not AP related
+              if (!columnMap) {
+                return; // this is continue actually
+              }
+
+              element.rows.forEach(function (row) {
+
+                var id = row[columnMap['id']];
+                var location = row[columnMap['location']];
+                var targetEnvironment = row[columnMap['targetEnvironment']];
+                var isKO = row[columnMap['status']] === 0;
+
+                var region = regions.find(function (r) {
+                  return location === r.name;
+                });
+                if (region === undefined) {
+                  region = {
+                    name: location,
+                    ids: [],
+                    failedIds: [],
+                    environments: {}
+                  };
+                  regions.push(region);
+                }
+
+                var idExists = region.ids.includes(id);
+                if (!idExists) {
+                  region.ids.push(id);
+                }
+                if (isKO) {
+                  if (!region.failedIds.includes(id)) {
+                    region.failedIds.push(id);
+                  }
+                }
+
+                if (targetEnvironment !== undefined) {
+                  if (region.environments[targetEnvironment]) {
+                    region.environments[targetEnvironment] = region.environments[targetEnvironment] + 1;
+                  } else {
+                    region.environments[targetEnvironment] = 1;
+                  }
+                }
+              });
+            });
+            return regions;
+          }
+        }, {
+          key: 'processAPESData',
+          value: function processAPESData(dataList) {
             var regions = [];
 
             dataList.forEach(function (element) {
@@ -309,19 +402,19 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
 
               // in case of KO need to understand if it fails
               if (isKO) {
-                // first find the OK equivalent 
-                var allTarget = element.target.replace("__KO", "__ALL");
+                // first find the OK equivalent
+                var allTarget = element.target.replace('__KO', '__ALL');
                 var allElement = dataList.find(function (d) {
                   return d.target == allTarget;
                 });
                 // if we can not find than it's serious error
                 if (allElement === undefined) {
-                  console.error("Unable to locate the " + allTarget + " data series.");
+                  console.error('Unable to locate the ' + allTarget + ' data series.');
                 } else {
                   for (var index = 0; index < element.datapoints.length; index++) {
                     var failingInstances = element.datapoints[index][0];
                     var allInstances = allElement.datapoints[index][0];
-                    if (failingInstances == allInstances) {
+                    if (failingInstances === allInstances) {
                       region.failedIds.push(id);
                       break;
                     }
@@ -331,6 +424,19 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
             });
 
             return regions;
+          }
+        }, {
+          key: 'processApData',
+          value: function processApData(dataList) {
+            var dsType = this.resolveDatasourceType();
+            switch (dsType) {
+              case 'influxdb':
+                return this.processAPInfluxTableData(dataList);
+              case 'elasticsearch':
+                return this.processAPESData(dataList);
+              default:
+                throw 'Unsupported datasource <' + dsType + '>';
+            }
           }
         }, {
           key: 'apSeriesHandler',

@@ -204,7 +204,7 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
   }
 
   buildColumnMap(columns) {
-    var required_columns = ['id', 'location', 'targetEnvironment', 'status'];
+    var required_columns = ['Time', 'id', 'location', 'targetEnvironment', 'status'];
     var columnMap = {};
     for (var i = 0; i < columns.length; i++) {
       var cName = columns[i].text;
@@ -240,6 +240,12 @@ export default class WorldmapCtrl extends MetricsPanelCtrl {
         const location = row[columnMap['location']];
         const targetEnvironment = row[columnMap['targetEnvironment']];
         const isKO = row[columnMap['status']] === 0;
+
+        if (id === '' || location === '' || targetEnvironment === '') {
+          const timeStamp = row[columnMap['Time']];
+          console.log('Skipping row at <' + new Date(timeStamp).toISOString() + '>! id, location or targetEnvironment are mandatory.');
+          return;
+        }
 
         let region = regions.find(r => location === r.name);
         if (region === undefined) {

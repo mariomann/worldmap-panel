@@ -283,7 +283,7 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
         }, {
           key: 'buildColumnMap',
           value: function buildColumnMap(columns) {
-            var required_columns = ['id', 'location', 'targetEnvironment', 'status'];
+            var required_columns = ['Time', 'id', 'location', 'targetEnvironment', 'status'];
             var columnMap = {};
             for (var i = 0; i < columns.length; i++) {
               var cName = columns[i].text;
@@ -319,6 +319,12 @@ System.register(['app/plugins/sdk', 'app/core/time_series2', 'app/core/utils/kbn
                 var location = row[columnMap['location']];
                 var targetEnvironment = row[columnMap['targetEnvironment']];
                 var isKO = row[columnMap['status']] === 0;
+
+                if (id === '' || location === '' || targetEnvironment === '') {
+                  var timeStamp = row[columnMap['Time']];
+                  console.log('Skipping row at <' + new Date(timeStamp).toISOString() + '>! id, location or targetEnvironment are mandatory.');
+                  return;
+                }
 
                 var region = regions.find(function (r) {
                   return location === r.name;

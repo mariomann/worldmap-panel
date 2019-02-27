@@ -71,23 +71,23 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
         }, {
           key: 'createLegend',
           value: function createLegend() {
-            var _this = this;
+            var _this2 = this;
 
             this.legend = window.L.control({ position: 'bottomleft' });
             this.legend.onAdd = function () {
-              _this.legend._div = window.L.DomUtil.create('div', 'info legend');
-              _this.legend.update();
-              return _this.legend._div;
+              _this2.legend._div = window.L.DomUtil.create('div', 'info legend');
+              _this2.legend.update();
+              return _this2.legend._div;
             };
 
             this.legend.update = function () {
-              var thresholds = _this.ctrl.data.thresholds;
+              var thresholds = _this2.ctrl.data.thresholds;
               var legendHtml = '';
-              legendHtml += '<div class="legend-item"><i style="background:' + _this.ctrl.panel.colors[0] + '"></i> ' + '&lt; ' + thresholds[0] + '</div>';
+              legendHtml += '<div class="legend-item"><i style="background:' + _this2.ctrl.panel.colors[0] + '"></i> ' + '&lt; ' + thresholds[0] + '</div>';
               for (var index = 0; index < thresholds.length; index += 1) {
-                legendHtml += '<div class="legend-item"><i style="background:' + _this.ctrl.panel.colors[index + 1] + '"></i> ' + thresholds[index] + (thresholds[index + 1] ? '&ndash;' + thresholds[index + 1] + '</div>' : '+');
+                legendHtml += '<div class="legend-item"><i style="background:' + _this2.ctrl.panel.colors[index + 1] + '"></i> ' + thresholds[index] + (thresholds[index + 1] ? '&ndash;' + thresholds[index + 1] + '</div>' : '+');
               }
-              _this.legend._div.innerHTML = legendHtml;
+              _this2.legend._div.innerHTML = legendHtml;
             };
             this.legend.addTo(this.map);
           }
@@ -104,10 +104,10 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
         }, {
           key: 'filterEmptyAndZeroValues',
           value: function filterEmptyAndZeroValues(data) {
-            var _this2 = this;
+            var _this3 = this;
 
             return _.filter(data, function (o) {
-              return !(_this2.ctrl.panel.hideEmpty && _.isNil(o.value)) && !(_this2.ctrl.panel.hideZero && o.value === 0);
+              return !(_this3.ctrl.panel.hideEmpty && _.isNil(o.value)) && !(_this3.ctrl.panel.hideZero && o.value === 0);
             });
           }
         }, {
@@ -133,12 +133,12 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
         }, {
           key: 'createCircles',
           value: function createCircles(data) {
-            var _this3 = this;
+            var _this4 = this;
 
             var circles = [];
             data.forEach(function (dataPoint) {
               if (!dataPoint.locationName) return;
-              circles.push(_this3.createCircle(dataPoint));
+              circles.push(_this4.createCircle(dataPoint));
             });
             this.circlesLayer = this.addCircles(circles);
             this.circles = circles;
@@ -146,27 +146,27 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
         }, {
           key: 'updateCircles',
           value: function updateCircles(data) {
-            var _this4 = this;
+            var _this5 = this;
 
             data.forEach(function (dataPoint) {
               if (!dataPoint.locationName) return;
 
-              var circle = _.find(_this4.circles, function (cir) {
+              var circle = _.find(_this5.circles, function (cir) {
                 return cir.options.location === dataPoint.key;
               });
 
               if (circle && dataPoint.isAp) {
-                _this4.updateApCircle(circle, dataPoint);
+                _this5.updateApCircle(circle, dataPoint);
               } else if (circle) {
-                circle.setRadius(_this4.calcCircleSize(dataPoint.value || 0));
+                circle.setRadius(_this5.calcCircleSize(dataPoint.value || 0));
                 circle.setStyle({
-                  color: _this4.getColor(dataPoint.value),
-                  fillColor: _this4.getColor(dataPoint.value),
+                  color: _this5.getColor(dataPoint.value),
+                  fillColor: _this5.getColor(dataPoint.value),
                   fillOpacity: 0.5,
                   location: dataPoint.key
                 });
                 circle.unbindPopup();
-                _this4.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
+                _this5.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
 
                 //TODO to function
                 circle.unbindTooltip();
@@ -227,14 +227,28 @@ System.register(['lodash', './libs/leaflet'], function (_export, _context) {
             this.createApPopup(circle, dataPoint);
 
             // create link for clicking on circle
-            // try to get target dashboard name from the variable called locationDashboard
-            var locationDashboardName = null;
-            if (this.ctrl.templateSrv.variableExists("$locationDashboard")) {
-              locationDashboardName = this.ctrl.templateSrv.replace("$locationDashboard");
-            } else {
-              locationDashboardName = "probe-overview-per-location";
+            // try to get target dashboard name and urlParams from Dashboard Variables
+            var locationDashboard = this.ctrl.templateSrv.variableExists("$locationDashboard") ? this.ctrl.templateSrv.replace("$locationDashboard") : "probe-overview-per-location";
+            var urlParamString = "";
+
+            if (this.ctrl.templateSrv.variableExists("$urlParams")) {
+              var urlParams = this.ctrl.templateSrv.variables.find(function (e) {
+                return e.name == "urlParams";
+              }).current.value.split(",");
+              var _this = this;
+              urlParams.forEach(function (urlParam) {
+                if (_this.ctrl.templateSrv.variableExists("$" + urlParam)) {
+                  var selectedValues = _this.ctrl.templateSrv.replace("$" + urlParam).replace("{", "").replace("}", "").split(",");
+                  selectedValues.forEach(function (selectedValue) {
+                    urlParamString = urlParamString.concat("var-" + urlParam + "=" + selectedValue + "&");
+                  });
+                } else {
+                  console.log("No dashboard variable exists for " + urlParam);
+                }
+              });
             }
-            var locationLink = 'dashboard/db/' + locationDashboardName + '?var-location=' + dataPoint.key;
+
+            var locationLink = 'dashboard/db/' + locationDashboard + '?' + urlParamString + 'var-location=' + dataPoint.key;
             circle.on('click', function (e) {
               window.open(locationLink, "_self");
             });

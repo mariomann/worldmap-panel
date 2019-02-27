@@ -222,14 +222,26 @@ export default class WorldMap {
     this.createApPopup(circle, dataPoint);
 
     // create link for clicking on circle
-    // try to get target dashboard name from the variable called locationDashboard
-    let locationDashboardName = null;
-    if (this.ctrl.templateSrv.variableExists("$locationDashboard")) {
-      locationDashboardName = this.ctrl.templateSrv.replace("$locationDashboard");
-    } else {
-      locationDashboardName = "probe-overview-per-location";
+    // try to get target dashboard name and urlParams from Dashboard Variables
+    var locationDashboard = this.ctrl.templateSrv.variableExists("$locationDashboard") ? this.ctrl.templateSrv.replace("$locationDashboard") : "probe-overview-per-location";
+    var urlParamString = "";
+
+    if (this.ctrl.templateSrv.variableExists("$urlParams")) {
+      var urlParams = this.ctrl.templateSrv.variables.find(e => e.name == "urlParams").current.value.split(",");
+      var _this = this
+      urlParams.forEach(urlParam => {
+        if (_this.ctrl.templateSrv.variableExists("$" + urlParam)) {
+          var selectedValues = _this.ctrl.templateSrv.replace("$" + urlParam).replace("{", "").replace("}", "").split(",");
+          selectedValues.forEach(selectedValue => {
+            urlParamString = urlParamString.concat("var-" + urlParam + "=" + selectedValue + "&");
+          });
+        } else {
+            console.log("No dashboard variable exists for " + urlParam)
+        }
+      });
     }
-    const locationLink = `dashboard/db/${locationDashboardName}?var-location=${dataPoint.key}`;
+
+    var locationLink = 'dashboard/db/' + locationDashboard + '?' + urlParamString + 'var-location=' + dataPoint.key;
     circle.on('click', function (e) {
       window.open(locationLink, "_self");
     });

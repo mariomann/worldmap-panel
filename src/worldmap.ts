@@ -138,16 +138,14 @@ export default class WorldMap {
   }
 
   updateCircles(data) {
-    data.forEach(dataPoint => {
-      if (!dataPoint.locationName) {
-        return;
-      }
+    data.forEach((dataPoint) => {
+      if (!dataPoint.locationName) return;
 
-      const circle = _.find(this.circles, cir => {
-        return cir.options.location === dataPoint.key;
-      });
+      const circle = _.find(this.circles, (cir) => { return cir.options.location === dataPoint.key; });
 
-      if (circle) {
+      if (circle && dataPoint.isAp) {
+        this.updateApCircle(circle, dataPoint);
+      } else if (circle) {
         circle.setRadius(this.calcCircleSize(dataPoint.value || 0));
         circle.setStyle({
           color: this.getColor(dataPoint.value),
@@ -157,6 +155,14 @@ export default class WorldMap {
         });
         circle.unbindPopup();
         this.createPopup(circle, dataPoint.locationName, dataPoint.valueRounded);
+
+        //TODO to function
+        circle.unbindTooltip();
+        const text = (dataPoint.totalProbes - dataPoint.failingProbes) + "/" + dataPoint.totalProbes;
+        circle.bindTooltip(text, {
+          permanent: true,
+          direction: 'center'
+        });
       }
     });
   }
@@ -174,6 +180,120 @@ export default class WorldMap {
     return circle;
   }
 
+  updateApCircle(circle, dataPoint) {
+    circle.setRadius(this.calcCircleSize(dataPoint.value || 0));
+    circle.setStyle({
+      color: this.getColor(dataPoint.successRate),
+      fillColor: this.getColor(dataPoint.successRate),
+      fillOpacity: 0.5,
+      location: dataPoint.key,
+    });
+    circle.unbindPopup();
+    this.createApPopup(circle, dataPoint);
+
+    circle.unbindTooltip();
+    this.createApTooltip(circle, dataPoint);
+  }
+
+  createApCircle(dataPoint) {
+    const circle = (<any>window).L.circleMarker([dataPoint.locationLatitude, dataPoint.locationLongitude], {
+      radius: this.calcCircleSize(dataPoint.value || 0),
+      color: this.getColor(dataPoint.successRate),
+      fillColor: this.getColor(dataPoint.successRate),
+      fillOpacity: 0.5,
+      location: dataPoint.key
+    });
+
+    this.createApTooltip(circle, dataPoint);
+    this.createApPopup(circle, dataPoint);
+
+    // create link for clicking on circle
+    // try to get target dashboard name and urlParams from Dashboard Variables
+    var locationDashboard = this.ctrl.templateSrv.variableExists("$locationDashboard") ? this.ctrl.templateSrv.replace("$locationDashboard") : "probe-overview-per-location";
+    var urlParamString = "";
+
+    if (this.ctrl.templateSrv.variableExists("$urlParams")) {
+      var urlParams = this.ctrl.templateSrv.variables.find(e => e.name == "urlParams").current.value.split(",");
+      var _this = this
+      urlParams.forEach(urlParam => {
+        if (_this.ctrl.templateSrv.variableExists("$" + urlParam)) {
+          var selectedValues = _this.ctrl.templateSrv.replace("$" + urlParam).replace("{", "").replace("}", "").split(",");
+          selectedValues.forEach(selectedValue => {
+            urlParamString = urlParamString.concat("var-" + urlParam + "=" + selectedValue + "&");
+          });
+        } else {
+            console.log("No dashboard variable exists for " + urlParam)
+        }
+      });
+    }
+
+    var locationLink = 'dashboard/db/' + locationDashboard + '?' + urlParamString + 'var-location=' + dataPoint.key;
+    circle.on('click', function (e) {
+      window.open(locationLink, "_self");
+    });
+
+    return circle;
+  }
+
+  createApTooltip(circle, dataPoint) {
+    //const text = dataPoint.failingProbes + "/" + dataPoint.totalProbes;
+    let text;
+    if (dataPoint.failingProbes <= 0) {
+      text = `<div class="ap-larger"><b>${dataPoint.totalProbes}</b></div>`;
+    } else {
+      text = `
+        <div class="ap-larger" style="margin-top: 20px;"><b>${dataPoint.totalProbes}</b></div>
+        <div class="ap-meter">
+            <span class="ap-meter-span" style="width: ${dataPoint.successRate}%"><b>${dataPoint.totalProbes - dataPoint.failingProbes}</b></span>
+        </div>
+      `;
+
+      // add  <div class="ap-meter-label"><b>${dataPoint.totalProbes - dataPoint.failingProbes}</b></div> to have number right to the progress bar
+    }
+
+    circle.bindTooltip(text, {
+      permanent: true,
+      direction: 'center'
+    });
+  }
+
+  createApPopup(circle, dataPoint) {
+    const locationName = dataPoint.locationName;
+    //const label = (locationName + ': ' + value + ' ' + (unit || '')).trim();
+    let label = `
+      <h4>[AP] ${locationName}</h4>
+      <ul>
+        <li>Success rate: ${dataPoint.successRate}% (${dataPoint.failingProbes} failing out of ${dataPoint.totalProbes})</li>
+        <li>Tested environments:
+    `;
+
+    for (var environment in dataPoint.targetEnvironments) {
+      label += `<br/>\t\t- ${environment}: ${dataPoint.targetEnvironments[environment]}`;
+    }
+
+    if(dataPoint.failingProbesNames.length > 0) {
+      label += `
+        </li>
+        <li>Failing probes name(s): ${dataPoint.failingProbesNames ? "<br/>\t\t- " + dataPoint.failingProbesNames.join("<br/>\t\t- ") : "-"}</li>
+      </ul>
+    `.trim();
+    }
+
+    circle.bindPopup(label, { 'offset': (<any>window).L.point(0, -2), 'className': 'worldmap-popup', 'closeButton': this.ctrl.panel.stickyLabels });
+
+    circle.on('mouseover', function onMouseOver(evt) {
+      const layer = evt.target;
+      layer.bringToFront();
+      this.openPopup();
+    });
+
+    if (!this.ctrl.panel.stickyLabels) {
+      circle.on('mouseout', function onMouseOut() {
+        circle.closePopup();
+      });
+    }
+  }
+  
   calcCircleSize(dataPointValue) {
     const circleMinSize = parseInt(this.ctrl.panel.circleMinSize, 10) || 2;
     const circleMaxSize = parseInt(this.ctrl.panel.circleMaxSize, 10) || 30;

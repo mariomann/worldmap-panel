@@ -13,6 +13,10 @@ System.register(['./css/leaflet.css!', './css/ap.css!', './worldmap'], function 
     function render() {
       if (!ctrl.data) return;
 
+      if (ctrl.panel.locationData === 'json endpoint') {
+        ctrl.dataFormatter.setApValues(ctrl.data);
+      }
+
       var mapContainer = elem.find('.mapcontainer');
 
       if (mapContainer[0].id.indexOf('{{') > -1) {

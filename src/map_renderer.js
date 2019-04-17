@@ -10,6 +10,10 @@ export default function link(scope, elem, attrs, ctrl) {
 
   function render() {
     if (!ctrl.data) return;
+    
+    if (ctrl.panel.locationData === 'json endpoint') {
+      ctrl.dataFormatter.setApValues(ctrl.data);
+    }
 
     const mapContainer = elem.find('.mapcontainer');
 
